@@ -1,0 +1,237 @@
+---
+title: "DATA 621 Homework 1"
+author: "Bin Lin"
+date: "2017-3-1"
+output: html_document
+---
+
+#Overview:
+The data set contains approximately 2200 records. Each record represents a professional baseball team from the years 1871 to 2006 inclusive. Each record has the performance of the team for the given year, with all of the statistics adjusted to match the performance of a 162 game season.
+
+#DATA EXPLORATION: 
+This dataset contains total 17 variables, each of which is numerical data. TARGET_WINS is our response variable. Its median is 82, mean is 80.79, and standard deviation is 15.752. According to the histogram of TARGET_WINS, we can tell it is bell shaped, symmetric and unimodal. The reasonable assumption is that it is normally distributed. The qq-plot has further prove that since most of the data points form a straight line along qqline. The number of explanatory variables are as many as 15. The scatterplots between TARGET_WINS and all other explanatory variables did not display obvious relationship. From the summary statistics, we have noticed that many variables have missing data. This will be taken care of in the data properation section.
+
+```{r, echo = FALSE}
+library(MASS)
+library(knitr)
+library(ggplot2)
+library(psych)
+
+moneyball_training_data <- read.csv("C:/Users/blin261/Desktop/DATA621/moneyball-training-data.csv")
+str(moneyball_training_data)
+training <- moneyball_training_data[, -1]
+
+summary(training)
+sd(training$TARGET_WINS)
+hist(training$TARGET_WINS)
+qqnorm(training$TARGET_WINS)
+qqline(training$TARGET_WINS)
+
+par(mfrow = c(3, 4))
+for (i in 2:ncol(training))
+{
+  plot(training[,i], training$TARGET_WINS, xlab= colnames(training)[i], ylab = colnames(training)[1])
+}
+```
+#DATA PREPARATION:
+
+After summing up all the missing values for each explanatory variables, I created a data frame which is going to show the frequency and percentage for occured missing data. The barplot clearly shows there are 6 variables which have large amount of data that is missing. By creating the histogram for each of these 6 variables, we are able to find the pattern for them, so that we will be able to replace the null values with some values that are more meaningful in this case. Apparently, TEAM_BATTING_HBP, TEAM_BASERUN_CS and TEAM_FIELDING_DP have missing more than 10% of the data, they have been excluded from the analysis. TEAM_BASERUN_SB and TEAM_PITCHING_SO are both is skewed to the left with many outliers, so median can better represent these two variables compare to mean. TEAM_BATING_SO is highly symmetric, therefore I use mean to resplace its missing values. 
+
+```{r, echo = FALSE}
+frequency <- c()
+total <- c()
+for (i in 1:ncol(training))
+  {
+  frequency <- c(frequency, (sum(is.na(training[,i]))))
+  total <- length(training[,i])
+}
+
+percentage <- round(frequency/total, 3)
+missing_values <- data.frame(colnames(training), frequency, percentage)
+
+ggplot(data = missing_values, aes(x = reorder(colnames(training), percentage), y = percentage)) + geom_bar(stat="identity") + coord_flip()
+
+
+par(mfrow = c(2, 3))
+boxplot(training$TEAM_BATTING_HBP, xlab= "TEAM_BATTING_HBP", na.rm = TRUE)
+boxplot(training$TEAM_BASERUN_CS, xlab= "TEAM_BASERUN_CS", na.rm = TRUE)
+boxplot(training$TEAM_FIELDING_DP, xlab= "TEAM_FIELDING_DP", na.rm = TRUE)
+boxplot(training$TEAM_BASERUN_SB, xlab= "TEAM_BASERUN_SB", na.rm = TRUE)
+boxplot(training$TEAM_PITCHING_SO, xlab= "TEAM_PITCHING_SO", na.rm = TRUE)
+boxplot(training$TEAM_BATTING_SO, xlab= "TEAM_BATING_SO", na.rm = TRUE)
+
+
+training$TEAM_BASERUN_SB[is.na(training$TEAM_BASERUN_SB)] <- median(training$TEAM_BASERUN_SB, na.rm = TRUE)
+training$TEAM_PITCHING_SO[is.na(training$TEAM_PITCHING_SO)] <- median(training$TEAM_PITCHING_SO, na.rm = TRUE)
+training$TEAM_BATTING_SO[is.na(training$TEAM_BATTING_SO)] <- median(training$TEAM_BATTING_SO, na.rm = TRUE)
+
+training <- training[,-c(9,10,16)]
+```
+
+
+#BUILD MODELS:
+
+##Model 1: 
+The first model I created include all the variables that were left in the training dataset. The coefficient for each variable is shown in the following. 
+```{r, echo = FALSE}
+m_full <- lm(TARGET_WINS ~ ., data = training)
+summary(m_full)
+```
+
+
+##Model2:
+For the second model, I used backward elimination process. I got rid of the variables that have the highest p-value. I stopped eliminating variables once all the variables have p-value less than 0.05, which making them statistically significant at $\alpha$ equals 0.5 level. Eventually, TEAM_PITCHING_BB, TEAM_PITCHING_HR, and TEAM_BATTING_BB were aliminated. The coefficient for each variable is shown in the following. 
+
+
+```{r, echo = FALSE}
+str(training)
+
+m_1 <- lm (TARGET_WINS ~ TEAM_BATTING_H +  TEAM_BATTING_2B + TEAM_BATTING_3B + TEAM_BATTING_HR +  TEAM_BATTING_BB + TEAM_BATTING_SO + TEAM_BASERUN_SB + TEAM_PITCHING_H + TEAM_PITCHING_HR + TEAM_PITCHING_BB + TEAM_PITCHING_SO + TEAM_FIELDING_E, data = training)
+summary(m_1)
+
+
+m_2 <- lm (TARGET_WINS ~ TEAM_BATTING_H +  TEAM_BATTING_2B + TEAM_BATTING_3B + TEAM_BATTING_HR +  TEAM_BATTING_BB + TEAM_BATTING_SO + TEAM_BASERUN_SB + TEAM_PITCHING_H + TEAM_PITCHING_HR + TEAM_PITCHING_SO + TEAM_FIELDING_E, data = training)
+summary(m_2)
+
+
+m_3 <- lm (TARGET_WINS ~ TEAM_BATTING_H +  TEAM_BATTING_2B + TEAM_BATTING_3B + TEAM_BATTING_HR +  TEAM_BATTING_BB + TEAM_BATTING_SO + TEAM_BASERUN_SB + TEAM_PITCHING_H + TEAM_PITCHING_SO + TEAM_FIELDING_E, data = training)
+summary(m_3)
+
+m_4 <- lm (TARGET_WINS ~ TEAM_BATTING_H +  TEAM_BATTING_2B + TEAM_BATTING_3B + TEAM_BATTING_HR + TEAM_BATTING_SO + TEAM_BASERUN_SB + TEAM_PITCHING_H + TEAM_PITCHING_SO + TEAM_FIELDING_E, data = training)
+summary(m_4)
+```
+
+
+##Model 3:
+
+For the third model, I used a different strategy. I use the build-in function called stepAIC to get the model using forward elimination method. 
+```{r, echo = FALSE}
+step1 <- stepAIC(m_full, direction = "forward")
+step1
+step1$anova
+```
+
+
+
+#SELECT MODELS:
+Decide on the criteria for selecting the best multiple linear regression model. Will you select a model
+with slightly worse performance if it makes more sense or is more parsimonious?
+
+The best model should contains all the variables that have statistically significant correlation with the response variable. Model 1 and model 3 maybe more powerful than model 2, because their models include all the variables. One of the largest problem with powerful model has always been overfitting. Because of that, model 2 is the best model. 
+
+```{r, echo = FALSE}
+#Model 1
+par(mfrow = c(2,2))
+plot(m_full)
+#Model 2
+par(mfrow = c(2,2))
+plot(m_4)
+#Model 3
+par(mfrow = c(2,2))
+plot(step1)
+```
+
+
+For the evaluation step, I modified the evaluation data set, making it suitable for model 2. The summary statistics for the response variable looks similar to the original training data. Therefore, model 2 has been pretty accurate at predicting moneyball data sets.  
+
+```{r, echo = FALSE}
+evaluation <- read.csv("C:/Users/blin261/Desktop/DATA621/moneyball-evaluation-data.csv")
+head(evaluation)
+str(evaluation)
+eval <- evaluation[,-c(1, 9, 10, 16)]
+
+eval$TEAM_BASERUN_SB[is.na(eval$TEAM_BASERUN_SB)] <- median(eval$TEAM_BASERUN_SB, na.rm = TRUE)
+eval$TEAM_PITCHING_SO[is.na(eval$TEAM_PITCHING_SO)] <- median(eval$TEAM_PITCHING_SO, na.rm = TRUE)
+eval$TEAM_BATTING_SO[is.na(eval$TEAM_BATTING_SO)] <- median(eval$TEAM_BATTING_SO, na.rm = TRUE)
+
+eval$TARGET_WINS <- predict(m_4, newdata = eval)
+summary(eval$TARGET_WINS)
+```
+
+#Appendix (Code)
+```{r}
+library(MASS)
+library(knitr)
+library(ggplot2)
+library(psych)
+
+moneyball_training_data <- read.csv("C:/Users/blin261/Desktop/DATA621/moneyball-training-data.csv")
+str(moneyball_training_data)
+training <- moneyball_training_data[, -1]
+
+summary(training)
+sd(training$TARGET_WINS)
+hist(training$TARGET_WINS)
+qqnorm(training$TARGET_WINS)
+qqline(training$TARGET_WINS)
+
+par(mfrow = c(3, 4))
+for (i in 2:ncol(training))
+{
+  plot(training[,i], training$TARGET_WINS, xlab= colnames(training)[i], ylab = colnames(training)[1])
+}
+
+frequency <- c()
+total <- c()
+for (i in 1:ncol(training))
+  {
+  frequency <- c(frequency, (sum(is.na(training[,i]))))
+  total <- length(training[,i])
+}
+percentage <- round(frequency/total, 3)
+missing_values <- data.frame(colnames(training), frequency, percentage)
+
+ggplot(data = missing_values, aes(x = reorder(colnames(training), percentage), y = percentage)) + geom_bar(stat="identity") + coord_flip()
+
+par(mfrow = c(2, 3))
+boxplot(training$TEAM_BATTING_HBP, xlab= "TEAM_BATTING_HBP", na.rm = TRUE)
+boxplot(training$TEAM_BASERUN_CS, xlab= "TEAM_BASERUN_CS", na.rm = TRUE)
+boxplot(training$TEAM_FIELDING_DP, xlab= "TEAM_FIELDING_DP", na.rm = TRUE)
+boxplot(training$TEAM_BASERUN_SB, xlab= "TEAM_BASERUN_SB", na.rm = TRUE)
+boxplot(training$TEAM_PITCHING_SO, xlab= "TEAM_PITCHING_SO", na.rm = TRUE)
+boxplot(training$TEAM_BATTING_SO, xlab= "TEAM_BATING_SO", na.rm = TRUE)
+
+training$TEAM_BASERUN_SB[is.na(training$TEAM_BASERUN_SB)] <- median(training$TEAM_BASERUN_SB, na.rm = TRUE)
+training$TEAM_PITCHING_SO[is.na(training$TEAM_PITCHING_SO)] <- median(training$TEAM_PITCHING_SO, na.rm = TRUE)
+training$TEAM_BATTING_SO[is.na(training$TEAM_BATTING_SO)] <- median(training$TEAM_BATTING_SO, na.rm = TRUE)
+
+training <- training[,-c(9,10,16)]
+m_full <- lm(TARGET_WINS ~ ., data = training)
+summary(m_full)
+str(training)
+
+m_1 <- lm (TARGET_WINS ~ TEAM_BATTING_H +  TEAM_BATTING_2B + TEAM_BATTING_3B + TEAM_BATTING_HR +  TEAM_BATTING_BB + TEAM_BATTING_SO + TEAM_BASERUN_SB + TEAM_PITCHING_H + TEAM_PITCHING_HR + TEAM_PITCHING_BB + TEAM_PITCHING_SO + TEAM_FIELDING_E, data = training)
+summary(m_1)
+
+m_2 <- lm (TARGET_WINS ~ TEAM_BATTING_H +  TEAM_BATTING_2B + TEAM_BATTING_3B + TEAM_BATTING_HR +  TEAM_BATTING_BB + TEAM_BATTING_SO + TEAM_BASERUN_SB + TEAM_PITCHING_H + TEAM_PITCHING_HR + TEAM_PITCHING_SO + TEAM_FIELDING_E, data = training)
+summary(m_2)
+
+m_3 <- lm (TARGET_WINS ~ TEAM_BATTING_H +  TEAM_BATTING_2B + TEAM_BATTING_3B + TEAM_BATTING_HR +  TEAM_BATTING_BB + TEAM_BATTING_SO + TEAM_BASERUN_SB + TEAM_PITCHING_H + TEAM_PITCHING_SO + TEAM_FIELDING_E, data = training)
+summary(m_3)
+
+m_4 <- lm (TARGET_WINS ~ TEAM_BATTING_H +  TEAM_BATTING_2B + TEAM_BATTING_3B + TEAM_BATTING_HR + TEAM_BATTING_SO + TEAM_BASERUN_SB + TEAM_PITCHING_H + TEAM_PITCHING_SO + TEAM_FIELDING_E, data = training)
+summary(m_4)
+
+step1 <- stepAIC(m_full, direction = "forward")
+step1
+step1$anova
+
+par(mfrow = c(2,2))
+plot(m_full)
+par(mfrow = c(2,2))
+plot(m_4)
+par(mfrow = c(2,2))
+plot(step1)
+
+evaluation <- read.csv("C:/Users/blin261/Desktop/DATA621/moneyball-evaluation-data.csv")
+head(evaluation)
+str(evaluation)
+eval <- evaluation[,-c(1, 9, 10, 16)]
+
+eval$TEAM_BASERUN_SB[is.na(eval$TEAM_BASERUN_SB)] <- median(eval$TEAM_BASERUN_SB, na.rm = TRUE)
+eval$TEAM_PITCHING_SO[is.na(eval$TEAM_PITCHING_SO)] <- median(eval$TEAM_PITCHING_SO, na.rm = TRUE)
+eval$TEAM_BATTING_SO[is.na(eval$TEAM_BATTING_SO)] <- median(eval$TEAM_BATTING_SO, na.rm = TRUE)
+
+eval$TARGET_WINS <- predict(m_4, newdata = eval)
+summary(eval$TARGET_WINS)
+```
